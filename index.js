@@ -1,4 +1,6 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 const bot_token = process.env.TOKEN;
 const prefix = '>';
@@ -11,18 +13,29 @@ aphro.once('ready', () => {
     console.log('Aphrodite is up and running!');
 });
 
+aphro.commands = new Collection();
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath,file);
+    const command = require(filePath);
+    aphro.commands.set(command.data.name, command);
+}
+
 aphro.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return; 
+    if (!interaction.isChatInputCommand()) return;
+    
+    const command = aphro.commands.get(interaction.commandName);
+    if (!command) return;
 
-    const { commandName } = interaction; 
-
-    if (commandName === 'ping') {
-        await interaction.reply('Pong');
-    } else if (commandName === 'server') {
-        await interaction.reply(`Server name: ${interaction.guild.name} \nTotal members: ${interaction.guild.memberCount}`);
-    } else {
-        await interaction.reply(`Your tag: ${interaction.user.tag} \nYour id: ${interaction.user.id}`);
+    try {
+        await command.execute(interaction);
+    } catch(error) {
+        console.log(error);
+        await interaction.reply({ content: 'Error while executing command.', ephemeral: true});
     }
 });
+
 
 aphro.login(bot_token);
